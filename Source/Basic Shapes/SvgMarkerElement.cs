@@ -1,5 +1,5 @@
-using System;
 using Svg.ExtensionMethods;
+using System;
 
 namespace Svg
 {
@@ -14,7 +14,7 @@ namespace Svg
         [SvgAttribute("marker-end")]
         public Uri MarkerEnd
         {
-            get { return GetAttribute<Uri>("marker-end", true); }
+            get { return GetAttribute<Uri>("marker-end", false).ReplaceWithNullIfNone(); }
             set { Attributes["marker-end"] = value; }
         }
 
@@ -24,7 +24,7 @@ namespace Svg
         [SvgAttribute("marker-mid")]
         public Uri MarkerMid
         {
-            get { return GetAttribute<Uri>("marker-mid", true); }
+            get { return GetAttribute<Uri>("marker-mid", false).ReplaceWithNullIfNone(); }
             set { Attributes["marker-mid"] = value; }
         }
 
@@ -34,7 +34,7 @@ namespace Svg
         [SvgAttribute("marker-start")]
         public Uri MarkerStart
         {
-            get { return GetAttribute<Uri>("marker-start", true); }
+            get { return GetAttribute<Uri>("marker-start", false).ReplaceWithNullIfNone(); }
             set { Attributes["marker-start"] = value; }
         }
 
@@ -46,11 +46,10 @@ namespace Svg
         protected internal override bool RenderStroke(ISvgRenderer renderer)
         {
             var result = base.RenderStroke(renderer);
-            var path = Path(renderer);
-            var pathLength = path.PointCount;
+            var path = this.Path(renderer);
+            var pathLength = path.PathPoints.Length;
 
-            var markerStart = MarkerStart.ReplaceWithNullIfNone();
-            if (markerStart != null)
+            if (this.MarkerStart != null)
             {
                 var refPoint1 = path.PathPoints[0];
                 var index = 1;
@@ -59,16 +58,15 @@ namespace Svg
                     ++index;
                 }
                 var refPoint2 = path.PathPoints[index];
-                var marker = OwnerDocument.GetElementById<SvgMarker>(markerStart.ToString());
+                SvgMarker marker = this.OwnerDocument.GetElementById<SvgMarker>(this.MarkerStart.ToString());
                 marker.RenderMarker(renderer, this, refPoint1, refPoint1, refPoint2, true);
             }
 
-            var markerMid = MarkerMid.ReplaceWithNullIfNone();
-            if (markerMid != null)
+            if (this.MarkerMid != null)
             {
-                var marker = OwnerDocument.GetElementById<SvgMarker>(markerMid.ToString());
-                var bezierIndex = -1;
-                for (var i = 1; i <= path.PathPoints.Length - 2; i++)
+                SvgMarker marker = this.OwnerDocument.GetElementById<SvgMarker>(this.MarkerMid.ToString());
+                int bezierIndex = -1;
+                for (int i = 1; i <= path.PathPoints.Length - 2; i++)
                 {
                     // for Bezier curves, the marker shall only been shown at the last point
                     if ((path.PathTypes[i] & 7) == 3)
@@ -81,8 +79,7 @@ namespace Svg
                 }
             }
 
-            var markerEnd = MarkerEnd.ReplaceWithNullIfNone();
-            if (markerEnd != null)
+            if (this.MarkerEnd != null)
             {
                 var index = pathLength - 1;
                 var refPoint1 = path.PathPoints[index];
@@ -92,7 +89,7 @@ namespace Svg
                     --index;
                 }
                 var refPoint2 = path.PathPoints[index];
-                var marker = OwnerDocument.GetElementById<SvgMarker>(markerEnd.ToString());
+                SvgMarker marker = this.OwnerDocument.GetElementById<SvgMarker>(this.MarkerEnd.ToString());
                 marker.RenderMarker(renderer, this, refPoint1, refPoint2, path.PathPoints[path.PathPoints.Length - 1], false);
             }
 

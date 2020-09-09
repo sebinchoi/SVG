@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Drawing.Text;
 using System.IO;
 using System.Text;
 using System.Xml;
@@ -30,22 +31,10 @@ namespace Svg
         /// </remarks>
         public static bool SkipGdiPlusCapabilityCheck { get; set; }
 
-        private static int? pointsPerInch;
-
-        public static int PointsPerInch
-        {
-            get { return pointsPerInch ?? (int) (pointsPerInch = GetSystemDpi()); }
-            set { pointsPerInch = value; }
-        } 
-
+        public static readonly int PointsPerInch = GetSystemDpi();
         private SvgElementIdManager _idManager;
 
         private Dictionary<string, IEnumerable<SvgFontFace>> _fontDefns = null;
-
-        public override SvgOverflow Overflow
-        {
-            get { return GetAttribute("overflow", false, SvgOverflow.Visible); }
-        }
 
         private static int GetSystemDpi()
         {
@@ -102,18 +91,7 @@ namespace Svg
             Ppi = PointsPerInch;
         }
 
-        private Uri baseUri;
-
-        public Uri BaseUri
-        {
-            get { return baseUri; }
-            set
-            {
-                if (value != null && !value.IsAbsoluteUri)
-                    throw new ArgumentException("BaseUri is not absolute.");
-                baseUri = value;
-            }
-        }
+        public Uri BaseUri { get; set; }
 
         /// <summary>
         /// Gets an <see cref="SvgElementIdManager"/> for this document.
@@ -151,8 +129,6 @@ namespace Svg
         /// Gets or sets an external Cascading Style Sheet (CSS)
         /// </summary>
         public string ExternalCSSHref { get; set; }
-
-        internal SvgFontManager FontManager { get; private set; }
 
         #region ITypeDescriptorContext Members
 
@@ -351,7 +327,7 @@ namespace Svg
                 var reader = new SvgTextReader(strReader, null)
                 {
                     XmlResolver = new SvgDtdResolver(),
-                    WhitespaceHandling = WhitespaceHandling.Significant
+                    WhitespaceHandling = WhitespaceHandling.None
                 };
                 return Open<T>(reader);
             }
@@ -374,7 +350,7 @@ namespace Svg
             var reader = new SvgTextReader(stream, entities)
             {
                 XmlResolver = new SvgDtdResolver(),
-                WhitespaceHandling = WhitespaceHandling.Significant
+                WhitespaceHandling = WhitespaceHandling.None
             };
             return Open<T>(reader);
         }
@@ -458,7 +434,6 @@ namespace Svg
                             break;
                         case XmlNodeType.CDATA:
                         case XmlNodeType.Text:
-                        case XmlNodeType.SignificantWhitespace:
                             element = elementStack.Peek();
                             element.Nodes.Add(new SvgContentNode() { Content = reader.Value });
                             break;
@@ -480,26 +455,42 @@ namespace Svg
                 var cssTotal = styles.Select((s) => s.Content).Aggregate((p, c) => p + Environment.NewLine + c);
                 var cssParser = new Parser();
                 var sheet = cssParser.Parse(cssTotal);
+                AggregateSelectorList aggList;
+                IEnumerable<BaseSelector> selectors;
+                IEnumerable<SvgElement> elemsToStyle;
 
                 foreach (var rule in sheet.StyleRules)
                 {
-                    try
+                    aggList = rule.Selector as AggregateSelectorList;
+                    if (aggList != null && aggList.Delimiter == ",")
                     {
-                        var rootNode = new NonSvgElement();
-                        rootNode.Children.Add(svgDocument);
+                        selectors = aggList;
+                    }
+                    else
+                    {
+                        selectors = Enumerable.Repeat(rule.Selector, 1);
+                    }
 
-                        var elemsToStyle = rootNode.QuerySelectorAll(rule.Selector.ToString(), elementFactory);
-                        foreach (var elem in elemsToStyle)
+                    foreach (var selector in selectors)
+                    {
+                        try
                         {
-                            foreach (var decl in rule.Declarations)
+                            var rootNode = new NonSvgElement();
+                            rootNode.Children.Add(svgDocument);
+
+                            elemsToStyle = rootNode.QuerySelectorAll(rule.Selector.ToString(), elementFactory);
+                            foreach (var elem in elemsToStyle)
                             {
-                                elem.AddStyle(decl.Name, decl.Term.ToString(), rule.Selector.GetSpecificity());
+                                foreach (var decl in rule.Declarations)
+                                {
+                                    elem.AddStyle(decl.Name, decl.Term.ToString(), rule.Selector.GetSpecificity());
+                                }
                             }
                         }
-                    }
-                    catch (Exception ex)
-                    {
-                        Trace.TraceWarning(ex.Message);
+                        catch (Exception ex)
+                        {
+                            Trace.TraceWarning(ex.Message);
+                        }
                     }
                 }
             }
@@ -536,12 +527,8 @@ namespace Svg
 
         private void Draw(ISvgRenderer renderer, ISvgBoundable boundable)
         {
-            using (FontManager = new SvgFontManager())
-            {
-                renderer.SetBoundable(boundable);
-                Render(renderer);
-                FontManager = null;
-            }
+            renderer.SetBoundable(boundable);
+            this.Render(renderer);
         }
 
         /// <summary>
@@ -635,6 +622,9 @@ namespace Svg
 
             using (var renderer = SvgRenderer.FromImage(bitmap))
             {
+                // EO, 2014-12-05: Requested to ensure proper zooming out (reduce size). Otherwise it clip the image.
+                this.Overflow = SvgOverflow.Auto;
+
                 var boundable = new GenericBoundable(0, 0, bitmap.Width, bitmap.Height);
                 this.Draw(renderer, boundable);
             }
@@ -735,7 +725,7 @@ namespace Svg
         public void Write(Stream stream, bool useBom = true)
         {
 
-            var xmlWriter = new XmlTextWriter(stream, useBom ? Encoding.UTF8 : new UTF8Encoding(false))
+            var xmlWriter = new XmlTextWriter(stream, useBom ? Encoding.UTF8 : new System.Text.UTF8Encoding(false))
             {
                 Formatting = Formatting.Indented
             };
@@ -756,21 +746,6 @@ namespace Svg
             {
                 this.Write(fs, useBom);
             }
-        }
-
-        protected override void WriteStartElement(XmlTextWriter writer)
-        {
-            base.WriteStartElement(writer);
-
-            foreach (var ns in SvgAttributeAttribute.Namespaces)
-            {
-                if (string.IsNullOrEmpty(ns.Key))
-                    writer.WriteAttributeString("xmlns", ns.Value);
-                else
-                    writer.WriteAttributeString("xmlns", ns.Key, null, ns.Value);
-            }
-
-            writer.WriteAttributeString("version", "1.1");
         }
     }
 }

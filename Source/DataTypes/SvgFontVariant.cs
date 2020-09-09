@@ -1,4 +1,8 @@
-﻿using System.ComponentModel;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.ComponentModel;
 
 namespace Svg
 {
@@ -6,7 +10,7 @@ namespace Svg
     public enum SvgFontVariant
     {
         Normal,
-        SmallCaps,
+        Smallcaps,
         Inherit
     }
 }

@@ -6,7 +6,7 @@ using System.Text;
 
 namespace Svg.FilterEffects
 {
-    [TypeConverter(typeof(SvgColourMatrixTypeConverter))]
+    [TypeConverter(typeof(EnumBaseConverter<SvgColourMatrixType>))]
     public enum SvgColourMatrixType
     {
         Matrix,

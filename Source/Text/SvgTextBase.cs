@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Drawing;
@@ -268,15 +268,12 @@ namespace Svg
                         continue;
                     path.AddPath(elem.Path(null), false);
                 }
-                if (Transforms == null || Transforms.Count == 0)
-                    return path.GetBounds();
-
-                using (path = (GraphicsPath)path.Clone())
-                using (var matrix = Transforms.GetMatrix())
+                if (Transforms != null && Transforms.Count > 0)
                 {
-                    path.Transform(matrix);
-                    return path.GetBounds();
+                    using (var matrix = Transforms.GetMatrix())
+                        path.Transform(matrix);
                 }
+                return path.GetBounds();
             }
         }
 
@@ -647,8 +644,7 @@ namespace Svg
                 // Get any defined anchors
                 var xAnchors = GetValues(value.Length, e => e._x, UnitRenderingType.HorizontalOffset);
                 var yAnchors = GetValues(value.Length, e => e._y, UnitRenderingType.VerticalOffset);
-                using (var fontManager = this.Element.OwnerDocument?.FontManager == null ? new SvgFontManager() : null)
-                using (var font = this.Element.GetFont(this.Renderer, fontManager))
+                using (var font = this.Element.GetFont(this.Renderer))
                 {
                     var fontBaselineHeight = font.Ascent(this.Renderer);
                     PathStatistics pathStats = null;

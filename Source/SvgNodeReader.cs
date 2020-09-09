@@ -130,8 +130,7 @@ namespace Svg
                 }
                 else
                 {
-                    base.ResolveEntity();
-                    _value = ReadAttributeValue() ? base.Value : string.Empty;
+                    _value = string.Empty;
                 }
 
                 _customValue = true;

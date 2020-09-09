@@ -1,9 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Drawing;
-using System.Linq;
+using System.Text;
+using System.Reflection;
+using System.ComponentModel;
 using Svg.DataTypes;
+using System.Text.RegularExpressions;
+using System.Linq;
 
 namespace Svg
 {
@@ -151,50 +154,8 @@ namespace Svg
         [SvgAttribute("shape-rendering")]
         public virtual SvgShapeRendering ShapeRendering
         {
-            get { return GetAttribute("shape-rendering", true, SvgShapeRendering.Auto); }
+            get { return GetAttribute<SvgShapeRendering>("shape-rendering", true); }
             set { Attributes["shape-rendering"] = value; }
-        }
-
-        /// <summary>
-        /// Gets or sets the color space for gradient interpolations, color animations and alpha compositing.
-        /// </summary>
-        [SvgAttribute("color-interpolation")]
-        public SvgColourInterpolation ColorInterpolation
-        {
-            get { return GetAttribute("color-interpolation", true, SvgColourInterpolation.SRGB); }
-            set { Attributes["color-interpolation"] = value; }
-        }
-
-        /// <summary>
-        /// Gets or sets the color space for imaging operations performed via filter effects.
-        /// NOT currently mapped through to bitmap
-        /// </summary>
-        [SvgAttribute("color-interpolation-filters")]
-        public SvgColourInterpolation ColorInterpolationFilters
-        {
-            get { return GetAttribute("color-interpolation-filters", true, SvgColourInterpolation.LinearRGB); }
-            set { Attributes["color-interpolation-filters"] = value; }
-        }
-
-        /// <summary>
-        /// Gets or sets a value to determine whether the element will be rendered.
-        /// </summary>
-        [SvgAttribute("visibility")]
-        public virtual string Visibility
-        {
-            get { return GetAttribute("visibility", true, "visible"); }
-            set { Attributes["visibility"] = value; }
-        }
-
-        /// <summary>
-        /// Gets or sets a value to determine whether the element will be rendered.
-        /// Needed to support SVG attribute display="none"
-        /// </summary>
-        [SvgAttribute("display")]
-        public virtual string Display
-        {
-            get { return GetAttribute("display", false, "inline"); }
-            set { Attributes["display"] = value; }
         }
 
         /// <summary>
@@ -203,7 +164,7 @@ namespace Svg
         [SvgAttribute("text-anchor")]
         public virtual SvgTextAnchor TextAnchor
         {
-            get { return GetAttribute("text-anchor", true, SvgTextAnchor.Start); }
+            get { return GetAttribute<SvgTextAnchor>("text-anchor", true); }
             set { Attributes["text-anchor"] = value; IsPathDirty = true; }
         }
 
@@ -243,7 +204,7 @@ namespace Svg
         [SvgAttribute("font-style")]
         public virtual SvgFontStyle FontStyle
         {
-            get { return GetAttribute("font-style", true, SvgFontStyle.Normal); }
+            get { return GetAttribute("font-style", true, SvgFontStyle.All); }
             set { Attributes["font-style"] = value; IsPathDirty = true; }
         }
 
@@ -253,7 +214,7 @@ namespace Svg
         [SvgAttribute("font-variant")]
         public virtual SvgFontVariant FontVariant
         {
-            get { return GetAttribute("font-variant", true, SvgFontVariant.Normal); }
+            get { return GetAttribute("font-variant", true, SvgFontVariant.Inherit); }
             set { Attributes["font-variant"] = value; IsPathDirty = true; }
         }
 
@@ -263,7 +224,7 @@ namespace Svg
         [SvgAttribute("text-decoration")]
         public virtual SvgTextDecoration TextDecoration
         {
-            get { return GetAttribute("text-decoration", true, SvgTextDecoration.None); }
+            get { return GetAttribute("text-decoration", true, SvgTextDecoration.Inherit); }
             set { Attributes["text-decoration"] = value; IsPathDirty = true; }
         }
 
@@ -273,18 +234,8 @@ namespace Svg
         [SvgAttribute("font-weight")]
         public virtual SvgFontWeight FontWeight
         {
-            get { return GetAttribute("font-weight", true, SvgFontWeight.Normal); }
+            get { return GetAttribute("font-weight", true, SvgFontWeight.Inherit); }
             set { Attributes["font-weight"] = value; IsPathDirty = true; }
-        }
-
-        /// <summary>
-        /// Indicates the desired amount of condensing or expansion in the glyphs used to render the text.
-        /// </summary>
-        [SvgAttribute("font-stretch")]
-        public virtual SvgFontStretch FontStretch
-        {
-            get { return GetAttribute("font-stretch", true, SvgFontStretch.Normal); }
-            set { Attributes["font-stretch"] = value; IsPathDirty = true; }
         }
 
         /// <summary>
@@ -392,7 +343,7 @@ namespace Svg
         /// Get the font information based on data stored with the text object or inherited from the parent.
         /// </summary>
         /// <returns></returns>
-        internal IFontDefn GetFont(ISvgRenderer renderer, SvgFontManager fontManager)
+        internal IFontDefn GetFont(ISvgRenderer renderer)
         {
             // Get the font-size
             float fontSize;
@@ -406,7 +357,7 @@ namespace Svg
                 fontSize = fontSizeUnit.ToDeviceValue(renderer, UnitRenderingType.Vertical, this);
             }
 
-            var family = ValidateFontFamily(this.FontFamily, this.OwnerDocument, fontManager ?? this.OwnerDocument.FontManager);
+            var family = ValidateFontFamily(this.FontFamily, this.OwnerDocument);
             var sFaces = family as IEnumerable<SvgFontFace>;
 
             if (sFaces == null)
@@ -416,33 +367,13 @@ namespace Svg
                 // Get the font-weight
                 switch (this.FontWeight)
                 {
-                    case SvgFontWeight.Bold:
+                    //Note: Bold is not listed because it is = W700.
+                    case SvgFontWeight.Bolder:
                     case SvgFontWeight.W600:
                     case SvgFontWeight.W700:
                     case SvgFontWeight.W800:
                     case SvgFontWeight.W900:
                         fontStyle |= System.Drawing.FontStyle.Bold;
-                        break;
-                    case SvgFontWeight.Bolder:
-                        switch (Parent?.FontWeight ?? SvgFontWeight.Normal)
-                        {
-                            case SvgFontWeight.W100:
-                            case SvgFontWeight.W200:
-                            case SvgFontWeight.W300:
-                                break;
-                            default:
-                                fontStyle |= System.Drawing.FontStyle.Bold;
-                                break;
-                        }
-                        break;
-                    case SvgFontWeight.Lighter:
-                        switch (Parent?.FontWeight ?? SvgFontWeight.Normal)
-                        {
-                            case SvgFontWeight.W800:
-                            case SvgFontWeight.W900:
-                                fontStyle |= System.Drawing.FontStyle.Bold;
-                                break;
-                        }
                         break;
                 }
 
@@ -473,7 +404,7 @@ namespace Svg
                 }
 
                 // Get the font-family
-                return new GdiFontDefn(new Font(ff, fontSize, fontStyle, GraphicsUnit.Pixel));
+                return new GdiFontDefn(new System.Drawing.Font(ff, fontSize, fontStyle, System.Drawing.GraphicsUnit.Pixel));
             }
             else
             {
@@ -487,22 +418,32 @@ namespace Svg
             }
         }
 
-        public static object ValidateFontFamily(string fontFamilyList, SvgDocument doc, SvgFontManager fontManager)
+        public static System.Drawing.Text.PrivateFontCollection PrivateFonts = new System.Drawing.Text.PrivateFontCollection();
+        public static object ValidateFontFamily(string fontFamilyList, SvgDocument doc)
         {
             // Split font family list on "," and then trim start and end spaces and quotes.
             var fontParts = (fontFamilyList ?? string.Empty).Split(new[] { ',' }).Select(fontName => fontName.Trim(new[] { '"', ' ', '\'' }));
+            FontFamily family;
+            IEnumerable<SvgFontFace> sFaces;
 
             // Find a the first font that exists in the list of installed font families.
-            // styles from IE get sent through as lowercase.
+            //styles from IE get sent through as lowercase.
             foreach (var f in fontParts)
             {
-                IEnumerable<SvgFontFace> fontFaces;
-                if (doc != null && doc.FontDefns().TryGetValue(f, out fontFaces))
-                    return fontFaces;
-
-                var family = fontManager.FindFont(f);
-                if (family != null)
-                    return family;
+                if (doc != null && doc.FontDefns().TryGetValue(f, out sFaces)) return sFaces;
+                family = SvgFontManager.FindFont(f);
+                if (family != null) return family;
+                family = PrivateFonts.Families.FirstOrDefault(ff => string.Equals(ff.Name, f, StringComparison.OrdinalIgnoreCase));
+                if (family != null) return family;
+                switch (f.ToLower())
+                {
+                    case "serif":
+                        return System.Drawing.FontFamily.GenericSerif;
+                    case "sans-serif":
+                        return System.Drawing.FontFamily.GenericSansSerif;
+                    case "monospace":
+                        return System.Drawing.FontFamily.GenericMonospace;
+                }
             }
 
             // No valid font family found from the list requested.

@@ -16,10 +16,10 @@ namespace Svg.Css
 
         public Selector<SvgElement> Type(NamespacePrefix prefix, string name)
         {
-            var types = _elementFactory.AvailableElements.Where(e => e.ElementName.Equals(name)).Select(e => e.ElementType);
-            if (types.Any())
+            SvgElementFactory.ElementInfo type = null;
+            if (_elementFactory.AvailableElements.TryGetValue(name, out type))
             {
-                return nodes => nodes.Where(n => types.Contains(n.GetType()));
+                return nodes => nodes.Where(n => n.GetType() == type.ElementType);
             }
             return nodes => Enumerable.Empty<SvgElement>();
         }
